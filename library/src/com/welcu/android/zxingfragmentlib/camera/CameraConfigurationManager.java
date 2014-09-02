@@ -16,9 +16,12 @@
 
 package com.welcu.android.zxingfragmentlib.camera;
 
+import android.annotation.SuppressLint;
+import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Point;
+import android.graphics.Rect;
 import android.hardware.Camera;
 import android.os.Build;
 import android.preference.PreferenceManager;
@@ -33,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -82,7 +86,9 @@ final class CameraConfigurationManager {
     Log.i(TAG, "Camera resolution: " + cameraResolution);
   }
 
-  void setDesiredCameraParameters(Camera camera, boolean safeMode) {
+
+@SuppressLint("NewApi")
+void setDesiredCameraParameters(Camera camera, boolean safeMode) {
     Camera.Parameters parameters = camera.getParameters();
 
     if (parameters == null) {
@@ -101,55 +107,98 @@ final class CameraConfigurationManager {
     initializeTorch(parameters, prefs, safeMode);
 
     String focusMode = null;
-    if (prefs.getBoolean(PreferencesActivity.KEY_AUTO_FOCUS, true)) {
-      if (safeMode || prefs.getBoolean(PreferencesActivity.KEY_DISABLE_CONTINUOUS_FOCUS, false)) {
-        focusMode = findSettableValue(parameters.getSupportedFocusModes(),
-                                      Camera.Parameters.FOCUS_MODE_AUTO);
-      } else {
-        focusMode = findSettableValue(parameters.getSupportedFocusModes(),
-                                      "continuous-picture", // Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE in 4.0+
-                                      "continuous-video",   // Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO in 4.0+
-                                      Camera.Parameters.FOCUS_MODE_AUTO);
-      }
-    }
-    // Maybe selected auto-focus but not available, so fall through here:
-    if (!safeMode && focusMode == null) {
-      focusMode = findSettableValue(parameters.getSupportedFocusModes(),
-                                    Camera.Parameters.FOCUS_MODE_MACRO,
-                                    "edof"); // Camera.Parameters.FOCUS_MODE_EDOF in 2.2+
-    }
-    if (focusMode != null) {
-      parameters.setFocusMode(focusMode);
-    }
+    focusMode = findSettableValue(parameters.getSupportedFocusModes(),
+			Camera.Parameters.FOCUS_MODE_AUTO);
+	// Maybe selected auto-focus but not available, so fall through here:
+	if (!safeMode && focusMode == null) {
+		focusMode = findSettableValue(parameters.getSupportedFocusModes(),
+				Camera.Parameters.FOCUS_MODE_MACRO, "edof"); // Camera.Parameters.FOCUS_MODE_EDOF
+																// in 2.2+
+	}
+	if (focusMode != null) {
+		parameters.setFocusMode(focusMode);
+	}
 
-    if (prefs.getBoolean(PreferencesActivity.KEY_INVERT_SCAN, false)) {
-      String colorMode = findSettableValue(parameters.getSupportedColorEffects(),
-                                           Camera.Parameters.EFFECT_NEGATIVE);
-      if (colorMode != null) {
-        parameters.setColorEffect(colorMode);
-      }
-    }
+    /** invert scan colors logic **/
+//    if (prefs.getBoolean(PreferencesActivity.KEY_INVERT_SCAN, false)) {
+//      String colorMode = findSettableValue(parameters.getSupportedColorEffects(),
+//                                           Camera.Parameters.EFFECT_NEGATIVE);
+//      if (colorMode != null) {
+//        parameters.setColorEffect(colorMode);
+//      }
+//    }
+
+    /** set zoom to optimize to small codes **/
+	if (parameters.isZoomSupported()) {
+		int targetZoomRatio = 100;
+		// 3.5x, ideal to scan seals
+		int targetZoom = -1;
+		List<Integer> zoomRatios = parameters.getZoomRatios();
+		for (Iterator<Integer> iterator = zoomRatios.iterator(); iterator
+				.hasNext();) {
+			Integer zoomRatio = (Integer) iterator.next();
+			if (zoomRatio >= targetZoomRatio) {
+				targetZoom = zoomRatios.lastIndexOf(zoomRatio);
+				break;
+			}
+		}
+		if (targetZoom == -1) {
+			// if not found, use higher zoom available
+			targetZoom = parameters.getMaxZoom();
+		}
+		parameters.setZoom(targetZoom);
+	}
+
+	/** Optimizing focus and metering on center screen - API 14 needed **/
+	if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
+		api14optimizations(parameters);
+	}
 
     parameters.setPreviewSize(cameraResolution.x, cameraResolution.y);
 
-    setOrientation(camera, parameters);
-
+    setOrientation(camera, parameters);   
+    
     camera.setParameters(parameters);
   }
+  
+  @TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH)
+	private void api14optimizations(Camera.Parameters parameters) {
+		Rect newRect = new Rect(-25, -25, 25, 25);
+		Camera.Area areaOfInterest = new Camera.Area(newRect, 1000);
+		if (parameters.getMaxNumFocusAreas() > 0) {
+			List<Camera.Area> focusAreas = new ArrayList<Camera.Area>();
+			focusAreas.add(areaOfInterest);
+			parameters.setFocusAreas(focusAreas);
+		}
+		if (parameters.getMaxNumMeteringAreas() > 0) {
+			List<Camera.Area> meteringAreas = new ArrayList<Camera.Area>();
+			meteringAreas.add(areaOfInterest);
+			parameters.setMeteringAreas(meteringAreas);
+		}
+	}
 
   private void setOrientation(Camera camera, Camera.Parameters parameters) {
       if (view.getWidth() < view.getHeight()){
-          if (Build.VERSION.SDK_INT==7) {
-              parameters.set("orientation", "portrait");
-              parameters.setRotation(90);
+          if (Build.VERSION.SDK_INT<=7) {
+              setOrientationBefore8(parameters);
           } else {
-              camera.setDisplayOrientation(90);
+              setOrientation8(camera);
           }
       }
   }
 
+  private void setOrientationBefore8(Camera.Parameters parameters) {
+      parameters.set("orientation", "portrait");
+      parameters.setRotation(90);
+  }
+
+  @TargetApi(Build.VERSION_CODES.FROYO)
+  private void setOrientation8(Camera camera) {
+      camera.setDisplayOrientation(90);
+  }
+
   Point getCameraResolution() {
-    return cameraResolution;
+	return cameraResolution;
   }
 
   Point getViewResolution() {

@@ -1,9 +1,15 @@
 package com.welcu.android.zxingfragmentlib;
 
+import java.io.IOException;
+import java.util.Collection;
+import java.util.Map;
+
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.Point;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.Handler;
@@ -25,10 +31,6 @@ import com.google.zxing.DecodeHintType;
 import com.google.zxing.Result;
 import com.google.zxing.ResultPoint;
 import com.welcu.android.zxingfragmentlib.camera.CameraManager;
-
-import java.io.IOException;
-import java.util.Collection;
-import java.util.Map;
 
 /*
  * Copyright (C) 2008 ZXing authors
@@ -61,6 +63,7 @@ public class BarCodeScannerFragment extends Fragment implements SurfaceHolder.Ca
 
     private static final long DEFAULT_INTENT_RESULT_DURATION_MS = 1500L;
     private static final long BULK_MODE_SCAN_DELAY_MS = 1000L;
+    public static final long DEFAULT_PAUSE_INTERVAL_DURATION = 2000L;
 
     public static final int HISTORY_REQUEST_CODE = 0x0000bacc;
 
@@ -159,10 +162,22 @@ public class BarCodeScannerFragment extends Fragment implements SurfaceHolder.Ca
             surfaceHolder.addCallback(this);
             surfaceHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
         }
-
+        
+        Intent intent = getActivity().getIntent();
+        if (intent.hasExtra("SCAN_HEIGHT") && intent.hasExtra("SCAN_WIDTH")) {
+            int width = intent.getIntExtra("SCAN_WIDTH", 0);
+            int height = intent.getIntExtra("SCAN_HEIGHT", 0);
+            if (width > 0 && height > 0) {
+            	Point screenResolution = cameraManager.getViewResolution();
+            	int leftOffset = (screenResolution.x - width) / 2;
+                int topOffset = (screenResolution.y - height) / 2;
+            	customFramingRect = new Rect((screenResolution.x - width) / 2, (screenResolution.y - height) / 2, leftOffset + width, topOffset + height);
+            }
+        }	        
+        
         if (customFramingRect!=null) {
-          cameraManager.setManualFramingRect(customFramingRect);
-        }
+        	cameraManager.setManualFramingRect(customFramingRect);
+        }    
 
         beepManager.updatePrefs();
         ambientLightManager.start(cameraManager);
@@ -171,8 +186,8 @@ public class BarCodeScannerFragment extends Fragment implements SurfaceHolder.Ca
 
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this.getActivity());
 
-        decodeFormats = null;
-        characterSet = null;
+        decodeFormats = DecodeFormatManager.QR_CODE_FORMATS;
+        characterSet = null;        
     }
 
     public void stopScan() {
@@ -303,14 +318,18 @@ public class BarCodeScannerFragment extends Fragment implements SurfaceHolder.Ca
         inactivityTimer.onActivity();
         lastResult = rawResult;
 
-        beepManager.playBeepSoundAndVibrate();
+//        beepManager.playBeepSoundAndVibrate();
         drawResultPoints(barcode, scaleFactor, rawResult);
 
+        if (viewfinderView != null) {
+        	viewfinderView.drawResultBitmap(barcode);
+        }
+        
         if (mCallBack != null) {
             mCallBack.result(rawResult);
-        }
+        }  
 
-        restartPreviewAfterDelay(500L);
+        restartPreviewAfterDelay(DEFAULT_PAUSE_INTERVAL_DURATION);
     }
     
     private boolean isPortrait() {
@@ -355,7 +374,7 @@ public class BarCodeScannerFragment extends Fragment implements SurfaceHolder.Ca
             	canvas.rotate(90);
             }
         }
-    }
+    }   
 
     private static void drawLine(Canvas canvas, Paint paint, ResultPoint a, ResultPoint b, float scaleFactor) {
         if (a != null && b != null) {
@@ -410,4 +429,13 @@ public class BarCodeScannerFragment extends Fragment implements SurfaceHolder.Ca
     public void drawViewfinder() {
         viewfinderView.drawViewfinder();
     }
+    
+    public void stopPreview() {
+    	cameraManager.stopPreview();
+    }
+    
+    public void startPreview() {
+    	cameraManager.startPreview();
+    }
+    
 }
