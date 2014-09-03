@@ -28,6 +28,8 @@ import android.view.SurfaceHolder;
 import android.view.View;
 
 import com.google.zxing.PlanarYUVLuminanceSource;
+import com.welcu.android.zxingfragmentlib.BarCodeScannerFragment;
+import com.welcu.android.zxingfragmentlib.R;
 import com.welcu.android.zxingfragmentlib.camera.open.OpenCameraManager;
 
 /**
@@ -59,6 +61,7 @@ public final class CameraManager {
   private int requestedFramingRectHeight = 0;
   private int requestedFramingRectLeftOffset = 0;
   private int requestedFramingRectTopOffset = 0;
+  private boolean isTurningFlash = false;
   /**
    * Preview frames are delivered here, which we pass on to the registered handler. Make sure to
    * clear the handler so it will only receive one message.
@@ -184,18 +187,28 @@ public final class CameraManager {
   /**
    * Convenience method for {@link com.welcu.android.zxingfragmentlib.BarCodeScannerFragment}
    */
-  public synchronized void setTorch(boolean newSetting) {
-    if (newSetting != configManager.getTorchState(camera)) {
-      if (camera != null) {
-        if (autoFocusManager != null) {
-          autoFocusManager.stop();
-        }
-        configManager.setTorch(camera, newSetting);
-        if (autoFocusManager != null) {
-          autoFocusManager.start();
-        }
+  public synchronized void setTorch(final boolean newSetting, final BarCodeScannerFragment scannerFragment) {
+      if (camera != null) {	  
+    	  isTurningFlash = true;
+		  CameraManager.TorchCallback callback = new CameraManager.TorchCallback() {
+	    	@Override
+	    	public void onTorch(boolean autoFocusState) {
+	    		Log.d("FLASH", "ON TORCH CALLBACK : " + autoFocusState);  		    		
+    			configManager.setTorch(camera, newSetting); 
+    			if (scannerFragment != null) {
+    				if (newSetting) {
+    					scannerFragment.flashView.setImageResource(R.drawable.photo_flash_on_selector);
+    				} else {
+    					scannerFragment.flashView.setImageResource(R.drawable.photo_flash_off_selector);
+    				}
+    			}
+	    	}
+		  };
+		  autoFocusManager.setCallback(callback);
+//		  if (autoFocusManager != null) {
+//	          autoFocusManager.stop();              
+//		  }
       }
-    }
   }
 
   /**
@@ -363,6 +376,14 @@ public final class CameraManager {
   
   public Point getViewResolution() {
 	  return configManager.getViewResolution();
+  }
+  
+  public boolean getTorchState() {
+	  return configManager.getTorchState(camera);
+  }
+  
+  public interface TorchCallback {
+	  public void onTorch(boolean autoFocusState);
   }
 
 }

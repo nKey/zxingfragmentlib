@@ -6,6 +6,7 @@ import java.util.Map;
 
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -22,9 +23,11 @@ import android.view.LayoutInflater;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
+import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.ImageView;
 
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.DecodeHintType;
@@ -78,9 +81,29 @@ public class BarCodeScannerFragment extends Fragment implements SurfaceHolder.Ca
     private String characterSet;
     private InactivityTimer inactivityTimer;
     private BeepManager beepManager;
-    private AmbientLightManager ambientLightManager;
+//    private AmbientLightManager ambientLightManager;
     private IResultCallback mCallBack;
     private Rect customFramingRect;
+    public ImageView flashView;
+    private boolean isTorch = false;
+    private boolean isFlashEnabled = false;
+    private OnClickListener flashListener = new OnClickListener() {
+		@Override
+		public void onClick(View arg0) {				
+			if (!isTorch) {
+				setTorchOn();				
+			} else {
+				setTorchOff();				
+			}
+//			flashView.setOnClickListener(null);
+			isTorch = !isTorch;				
+		}
+    };
+    
+    public void setFlashListener() {
+    	Log.d("FLASH", "SET FLASH LISTENER");
+//    	flashView.setOnClickListener(flashListener);
+    }
 
     ViewfinderView getViewfinderView() {
         return viewfinderView;
@@ -101,8 +124,10 @@ public class BarCodeScannerFragment extends Fragment implements SurfaceHolder.Ca
         hasSurface = false;
         inactivityTimer = new InactivityTimer(this.getActivity());
         beepManager = new BeepManager(this.getActivity());
-        ambientLightManager = new AmbientLightManager(this.getActivity());
+//        ambientLightManager = new AmbientLightManager(this.getActivity());
 
+        isFlashEnabled = getActivity().getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH);
+        
         PreferenceManager.setDefaultValues(this.getActivity(), R.xml.preferences, false);
     }
 
@@ -147,6 +172,15 @@ public class BarCodeScannerFragment extends Fragment implements SurfaceHolder.Ca
 
         viewfinderView = (ViewfinderView) getView().findViewById(R.id.viewfinder_view);
         viewfinderView.setCameraManager(cameraManager);
+        
+        flashView = (ImageView) getView().findViewById(R.id.flash_view);
+        flashView.setImageDrawable(getActivity().getResources().getDrawable(R.drawable.photo_flash_off_selector));
+        flashView.setOnClickListener(flashListener);
+        if (isFlashEnabled) {
+        	flashView.setVisibility(View.VISIBLE);
+        } else {
+        	flashView.setVisibility(View.GONE);
+        }
 
         handler = null;
         lastResult = null;
@@ -180,7 +214,7 @@ public class BarCodeScannerFragment extends Fragment implements SurfaceHolder.Ca
         }    
 
         beepManager.updatePrefs();
-        ambientLightManager.start(cameraManager);
+//        ambientLightManager.start(cameraManager);
 
         inactivityTimer.onResume();
 
@@ -201,7 +235,7 @@ public class BarCodeScannerFragment extends Fragment implements SurfaceHolder.Ca
             handler = null;
         }
         inactivityTimer.onPause();
-        ambientLightManager.stop();
+//        ambientLightManager.stop();
         cameraManager.closeDriver();
         cameraManager = null;
 
@@ -214,7 +248,7 @@ public class BarCodeScannerFragment extends Fragment implements SurfaceHolder.Ca
 
     public void setTorch(boolean state) {
       if (cameraManager!=null) {
-        cameraManager.setTorch(state);
+        cameraManager.setTorch(state, this);
       }
     }
 
@@ -438,4 +472,12 @@ public class BarCodeScannerFragment extends Fragment implements SurfaceHolder.Ca
     	cameraManager.startPreview();
     }
     
+    public void setFlashListener(OnClickListener listener) {
+    	if (listener == null) {
+    		flashView.setOnClickListener(flashListener);
+    	} else {
+    		flashView.setOnClickListener(listener);
+    	}
+    }
+
 }

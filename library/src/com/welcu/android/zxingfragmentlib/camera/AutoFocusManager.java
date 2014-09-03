@@ -16,19 +16,20 @@
 
 package com.welcu.android.zxingfragmentlib.camera;
 
+import java.util.ArrayList;
+import java.util.Collection;
+
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.hardware.Camera;
 import android.os.AsyncTask;
+import android.os.Handler;
 import android.preference.PreferenceManager;
 import android.util.Log;
 
 import com.welcu.android.zxingfragmentlib.PreferencesActivity;
 import com.welcu.android.zxingfragmentlib.common.executor.AsyncTaskExecInterface;
 import com.welcu.android.zxingfragmentlib.common.executor.AsyncTaskExecManager;
-
-import java.util.ArrayList;
-import java.util.Collection;
 
 final class AutoFocusManager implements Camera.AutoFocusCallback {
 
@@ -47,6 +48,7 @@ final class AutoFocusManager implements Camera.AutoFocusCallback {
   private final Camera camera;
   private AutoFocusTask outstandingTask;
   private final AsyncTaskExecInterface taskExec;
+  private CameraManager.TorchCallback callback;  
 
   AutoFocusManager(Context context, Camera camera) {
     this.camera = camera;
@@ -56,16 +58,21 @@ final class AutoFocusManager implements Camera.AutoFocusCallback {
     useAutoFocus =
         sharedPrefs.getBoolean(PreferencesActivity.KEY_AUTO_FOCUS, true) &&
         FOCUS_MODES_CALLING_AF.contains(currentFocusMode);
-    Log.i(TAG, "Current focus mode '" + currentFocusMode + "'; use auto focus? " + useAutoFocus);
+    Log.i(TAG, "Current focus mode '" + currentFocusMode + "'; use auto focus? " + useAutoFocus);    
     start();
   }
 
   @Override
   public synchronized void onAutoFocus(boolean success, Camera theCamera) {
-    if (active) {
-      outstandingTask = new AutoFocusTask();
-      taskExec.execute(outstandingTask);
-    }
+	  Log.d("FLASH", "ON AUTO FOCUS : " + active);
+	  if (active) {
+		  if (success && callback != null && ((outstandingTask != null && outstandingTask.getStatus() != AsyncTask.Status.RUNNING) || outstandingTask == null)) {
+	    	  callback.onTorch(active); 
+	    	  callback = null;
+	      } 
+		  outstandingTask = new AutoFocusTask();
+		  taskExec.execute(outstandingTask);	      
+	  }
   }
 
   synchronized void start() {
@@ -94,6 +101,7 @@ final class AutoFocusManager implements Camera.AutoFocusCallback {
       outstandingTask = null;
     }
     active = false;
+    
   }
 
   private final class AutoFocusTask extends AsyncTask<Object,Object,Object> {
@@ -111,6 +119,13 @@ final class AutoFocusManager implements Camera.AutoFocusCallback {
       }
       return null;
     }
+  }
+  
+  public CameraManager.TorchCallback getCallback() {
+	  return callback;
+  }
+  public void setCallback(CameraManager.TorchCallback newCallback) {
+	  this.callback = newCallback;
   }
 
 }
