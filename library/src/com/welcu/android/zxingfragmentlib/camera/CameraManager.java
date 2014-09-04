@@ -16,12 +16,13 @@
 
 package com.welcu.android.zxingfragmentlib.camera;
 
-import java.io.IOException;
 
+import java.io.IOException;
 import android.content.Context;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.hardware.Camera;
+import android.hardware.Camera.PictureCallback;
 import android.os.Handler;
 import android.util.Log;
 import android.view.SurfaceHolder;
@@ -29,6 +30,7 @@ import android.view.View;
 
 import com.google.zxing.PlanarYUVLuminanceSource;
 import com.welcu.android.zxingfragmentlib.BarCodeScannerFragment;
+import com.welcu.android.zxingfragmentlib.ImageHelper;
 import com.welcu.android.zxingfragmentlib.R;
 import com.welcu.android.zxingfragmentlib.camera.open.OpenCameraManager;
 
@@ -51,7 +53,7 @@ public final class CameraManager {
   private final Context context;
   private final View view;
   private final CameraConfigurationManager configManager;
-  private Camera camera;
+  public Camera camera;
   private AutoFocusManager autoFocusManager;
   private Rect framingRect;
   private Rect framingRectInPreview;
@@ -61,7 +63,9 @@ public final class CameraManager {
   private int requestedFramingRectHeight = 0;
   private int requestedFramingRectLeftOffset = 0;
   private int requestedFramingRectTopOffset = 0;
-  private boolean isTurningFlash = false;
+  public boolean takePicture = false;
+  public byte[] photoFromCamera;
+  
   /**
    * Preview frames are delivered here, which we pass on to the registered handler. Make sure to
    * clear the handler so it will only receive one message.
@@ -190,7 +194,6 @@ public final class CameraManager {
   public synchronized void setTorch(final boolean newSetting, final BarCodeScannerFragment scannerFragment) {
       if (camera != null) {	  
     	  // Original implementation's flow is as follow: stop autofocus, set torch, start autofocus. This was changed due to autofocus and torch concurrency.
-    	  isTurningFlash = true;
 		  CameraManager.TorchCallback callback = new CameraManager.TorchCallback() {
 	    	@Override
 	    	public void onTorch(boolean autoFocusState) {
@@ -289,6 +292,7 @@ public final class CameraManager {
 		  // Called early, before init even finished
 		  return null;
 		}      
+				
 		if (rect.width() >= rect.height()) {
 			rect.left = rect.left * cameraResolution.y / screenResolution.x;
 			rect.right = rect.right * cameraResolution.y / screenResolution.x;
@@ -300,6 +304,7 @@ public final class CameraManager {
 			rect.top = rect.top * cameraResolution.y / screenResolution.y;
 			rect.bottom = rect.bottom * cameraResolution.y / screenResolution.y;
 		}  
+		
 		framingRectInPreview = rect;    
     }
 
@@ -357,7 +362,7 @@ public final class CameraManager {
     if (rect == null) {
       return null;
     }
-
+    
 //     decode assumes landscape - rotate preview frame if portrait    
     if (view.getWidth() < view.getHeight()) {
         Log.d(TAG, "rotating: width="+height+" height="+width);
@@ -366,7 +371,7 @@ public final class CameraManager {
     		for (int x = 0; x < width; x++)
     			rotatedData[x * height + height - y - 1] = data[x + y * width];
         }
-        return new PlanarYUVLuminanceSource(rotatedData, height, width, rect.left, rect.top, rect.height(), rect.width(), false);
+        return new PlanarYUVLuminanceSource(rotatedData, height, width, rect.left, rect.top, rect.width(), rect.height(), false);
     } else {    	
       return new PlanarYUVLuminanceSource(data, width, height, rect.left, rect.top, rect.width(), rect.height(), false);
     }
@@ -386,5 +391,27 @@ public final class CameraManager {
   public interface TorchCallback {
 	  public void onTorch(boolean autoFocusState);
   }
-
+  
+  public byte[] takePicture() {
+	  if (takePicture) {
+		  stopPreview();
+		  startPreview();
+		  try {
+			  camera.takePicture(null, null, new PictureCallback() {
+			  @Override
+			  	public void onPictureTaken(byte[] data, Camera camera) {
+				  stopPreview();
+				  photoFromCamera = data;	
+				  ImageHelper.resizeRotateAndSaveByteArrayToSDCardPath(ImageHelper.scanPhotoTempName, data, 1024, 768);
+			  }
+			  });
+		  } catch (Exception e) {
+			  e.printStackTrace();		
+		  }
+	  }
+	  
+	  return photoFromCamera;
+  }
+  
+  
 }

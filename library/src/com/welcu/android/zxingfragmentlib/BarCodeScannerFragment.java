@@ -4,8 +4,8 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Map;
 
+import android.annotation.SuppressLint;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -18,6 +18,7 @@ import android.os.Message;
 import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
 import android.util.Log;
+import android.view.Display;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.SurfaceHolder;
@@ -71,7 +72,7 @@ public class BarCodeScannerFragment extends Fragment implements SurfaceHolder.Ca
 
     public static final int HISTORY_REQUEST_CODE = 0x0000bacc;
 
-    private CameraManager cameraManager;
+    public CameraManager cameraManager;
     private BarCodeScannerHandler handler;
     private Result savedResultToShow;
     private ViewfinderView viewfinderView;
@@ -89,7 +90,9 @@ public class BarCodeScannerFragment extends Fragment implements SurfaceHolder.Ca
     public ProgressBar flashLoading;
     private boolean isTorch = false;
     public boolean isTurningFlash = false;
-
+    private boolean isPhotoCapture = false;
+    private Bitmap resultBitmap;
+    
     ViewfinderView getViewfinderView() {
         return viewfinderView;
     }
@@ -151,7 +154,7 @@ public class BarCodeScannerFragment extends Fragment implements SurfaceHolder.Ca
         // want to open the camera driver and measure the screen size if we're going to show the help on
         // first launch. That led to bugs where the scanning rectangle was the wrong size and partially
         // off screen.
-        cameraManager = new CameraManager(this.getActivity().getApplication(), getView());
+        cameraManager = new CameraManager(this.getActivity().getApplication(), getView());        
 
         viewfinderView = (ViewfinderView) getView().findViewById(R.id.viewfinder_view);
         viewfinderView.setCameraManager(cameraManager);
@@ -164,7 +167,6 @@ public class BarCodeScannerFragment extends Fragment implements SurfaceHolder.Ca
     		public void onClick(View arg0) {	
     			if (!isTurningFlash) {
     				isTurningFlash = true;
-    				
     				if (!isTorch) {
     					setTorchOn();				
     				} else {
@@ -176,6 +178,7 @@ public class BarCodeScannerFragment extends Fragment implements SurfaceHolder.Ca
     			}
     		}        	
         });
+
         if (getActivity().getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH)) {
         	flashView.setVisibility(View.VISIBLE);
         } else {
@@ -197,31 +200,57 @@ public class BarCodeScannerFragment extends Fragment implements SurfaceHolder.Ca
             surfaceHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
         }
         
-        Intent intent = getActivity().getIntent();
-        if (intent.hasExtra("SCAN_HEIGHT") && intent.hasExtra("SCAN_WIDTH")) {
-            int width = intent.getIntExtra("SCAN_WIDTH", 0);
-            int height = intent.getIntExtra("SCAN_HEIGHT", 0);
-            if (width > 0 && height > 0) {
-            	Point screenResolution = cameraManager.getViewResolution();
-            	int leftOffset = (screenResolution.x - width) / 2;
-                int topOffset = (screenResolution.y - height) / 2;
-            	customFramingRect = new Rect((screenResolution.x - width) / 2, (screenResolution.y - height) / 2, leftOffset + width, topOffset + height);
-            }
-        }	        
+        setupConfigFromIntent();   
         
         if (customFramingRect!=null) {
         	cameraManager.setManualFramingRect(customFramingRect);
         }    
+        
+        cameraManager.takePicture = isPhotoCapture;
 
         beepManager.updatePrefs();
         ambientLightManager.start(cameraManager);
-
-        inactivityTimer.onResume();
-
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this.getActivity());
-
-        decodeFormats = DecodeFormatManager.QR_CODE_FORMATS;
+        inactivityTimer.onResume();        
         characterSet = null;        
+    }
+    
+    @SuppressLint("NewApi")
+	public void setupConfigFromIntent() {
+    	Intent intent = getActivity().getIntent();
+    	if (intent != null) {
+    		boolean isOneD = false;
+    		if (intent.hasExtra("SCAN_DIMENSION")) {
+	        	if (intent.getStringExtra("SCAN_DIMENSION").equals("1D")) {
+	        		decodeFormats = DecodeFormatManager.ONE_D_FORMATS;
+	        		isOneD = true;
+	        	} else {
+	        		decodeFormats = DecodeFormatManager.QR_CODE_FORMATS;
+	        	}
+	        }
+	        if (intent.hasExtra("SCAN_HEIGHT") && intent.hasExtra("SCAN_WIDTH")) {
+	            int width = intent.getIntExtra("SCAN_WIDTH", 0);
+	            int height = intent.getIntExtra("SCAN_HEIGHT", 0);
+            	Display display = getActivity().getWindowManager().getDefaultDisplay();
+            	Point size = new Point();
+            	display.getSize(size);          	
+	            if (width > 0 && height > 0) {
+	            	if (isOneD) {
+	            		width = size.x;
+	            	}
+	            	Point screenResolution = cameraManager.getViewResolution();
+	            	int leftOffset = 0;
+	            	if (!isOneD) {
+	            		leftOffset = (screenResolution.x - width) / 2;
+	            	}
+	                int topOffset = (screenResolution.y - height) / 2;
+            		customFramingRect = new Rect(leftOffset, topOffset, leftOffset + width, topOffset + height);	                
+	            }
+	        }
+	        if (intent.hasExtra("PHOTO_CAPTURE")) {
+	        	isPhotoCapture = intent.getBooleanExtra("PHOTO_CAPTURE", false);	
+	        }
+	             
+    	}
     }
 
     public void stopScan() {
@@ -356,8 +385,9 @@ public class BarCodeScannerFragment extends Fragment implements SurfaceHolder.Ca
         drawResultPoints(barcode, scaleFactor, rawResult);
 
         if (viewfinderView != null) {
+        	resultBitmap = barcode;
         	viewfinderView.drawResultBitmap(barcode);
-        }
+        }     
         
         if (mCallBack != null) {
             mCallBack.result(rawResult);
@@ -454,7 +484,7 @@ public class BarCodeScannerFragment extends Fragment implements SurfaceHolder.Ca
 
     }
 
-    public void restartPreviewAfterDelay(long delayMS) {
+    public void restartPreviewAfterDelay(long delayMS) {    	
         if (handler != null) {
             handler.sendEmptyMessageDelayed(RESTART_PREVIEW, delayMS);
         }
@@ -470,6 +500,18 @@ public class BarCodeScannerFragment extends Fragment implements SurfaceHolder.Ca
     
     public void startPreview() {
     	cameraManager.startPreview();
+    }
+    
+    public Bitmap getResultBitmap() {
+    	return resultBitmap;
+    }
+    
+    public boolean isPhotoCapture() {
+    	return isPhotoCapture;
+    }
+    
+    public byte[] getPhotoFromCamera() {
+    	return cameraManager.photoFromCamera;
     }
     
 }

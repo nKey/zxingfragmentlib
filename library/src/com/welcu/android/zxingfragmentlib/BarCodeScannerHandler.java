@@ -57,6 +57,7 @@ public class BarCodeScannerHandler extends Handler implements IConstants {
                 break;
             case DECODE_SUCCEDED:
                 Log.v(TAG, "Decode SUCCEEDED");
+                cameraManager.takePicture();
                 state = State.SUCCESS;
                 Bundle bundle = message.getData();
                 Bitmap barcode = null;

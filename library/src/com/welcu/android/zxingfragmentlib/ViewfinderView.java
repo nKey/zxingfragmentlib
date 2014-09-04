@@ -110,7 +110,7 @@ public final class ViewfinderView extends View {
       
       Rect previewFrame = cameraManager.getFramingRectInPreview();
       float scaleX = frame.width() / (float) previewFrame.width();
-      float scaleY = frame.height() / (float) previewFrame.height();
+      float scaleY = frame.height() / (float) previewFrame.height(); 
 
       List<ResultPoint> currentPossible = possibleResultPoints;
       List<ResultPoint> currentLast = lastPossibleResultPoints;
