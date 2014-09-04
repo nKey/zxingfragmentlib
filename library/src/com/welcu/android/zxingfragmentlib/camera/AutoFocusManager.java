@@ -64,7 +64,6 @@ final class AutoFocusManager implements Camera.AutoFocusCallback {
 
   @Override
   public synchronized void onAutoFocus(boolean success, Camera theCamera) {
-	  Log.d("FLASH", "ON AUTO FOCUS : " + active);
 	  if (active) {
 		  if (success && callback != null && ((outstandingTask != null && outstandingTask.getStatus() != AsyncTask.Status.RUNNING) || outstandingTask == null)) {
 	    	  callback.onTorch(active); 

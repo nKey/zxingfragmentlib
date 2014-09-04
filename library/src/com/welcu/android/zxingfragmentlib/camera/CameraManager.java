@@ -189,11 +189,11 @@ public final class CameraManager {
    */
   public synchronized void setTorch(final boolean newSetting, final BarCodeScannerFragment scannerFragment) {
       if (camera != null) {	  
+    	  // Original implementation's flow is as follow: stop autofocus, set torch, start autofocus. This was changed due to autofocus and torch concurrency.
     	  isTurningFlash = true;
 		  CameraManager.TorchCallback callback = new CameraManager.TorchCallback() {
 	    	@Override
 	    	public void onTorch(boolean autoFocusState) {
-	    		Log.d("FLASH", "ON TORCH CALLBACK : " + autoFocusState);  		    		
     			configManager.setTorch(camera, newSetting); 
     			if (scannerFragment != null) {
     				if (newSetting) {
@@ -201,13 +201,14 @@ public final class CameraManager {
     				} else {
     					scannerFragment.flashView.setImageResource(R.drawable.photo_flash_off_selector);
     				}
+    				scannerFragment.isTurningFlash = false;
+    				scannerFragment.flashLoading.setVisibility(View.INVISIBLE);
+    				scannerFragment.flashView.setVisibility(View.VISIBLE);
+    				
     			}
 	    	}
 		  };
 		  autoFocusManager.setCallback(callback);
-//		  if (autoFocusManager != null) {
-//	          autoFocusManager.stop();              
-//		  }
       }
   }
 

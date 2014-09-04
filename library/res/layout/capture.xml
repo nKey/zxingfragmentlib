@@ -26,5 +26,23 @@
       android:id="@+id/viewfinder_view"
       android:layout_width="fill_parent"
       android:layout_height="fill_parent"/>
-
+  
+  <FrameLayout
+      android:layout_width="60dp"
+      android:layout_height="60dp"
+      android:layout_gravity="right|top"
+      android:padding="10dp">
+	  <ImageView 
+	    	android:id="@+id/flash_view"
+	  	    android:layout_width="wrap_content"
+	  	    android:layout_height="wrap_content"  	    
+	  	    android:contentDescription="Flash"
+	  	    android:src="@drawable/photo_flash_off_selector"  	    
+	  	    />
+	  <ProgressBar
+	      android:id="@+id/flash_loading"
+	      android:layout_width="wrap_content"
+	      android:layout_height="wrap_content"
+	      android:visibility="invisible"/>
+  </FrameLayout>
 </FrameLayout>
