@@ -165,7 +165,7 @@ public class BarCodeScannerFragment extends Fragment implements SurfaceHolder.Ca
         flashView.setOnClickListener(new OnClickListener() {
     		@Override
     		public void onClick(View arg0) {	
-    			if (!isTurningFlash) {
+    			if (!isTurningFlash && cameraManager.getPreviewing()) {
     				isTurningFlash = true;
     				if (!isTorch) {
     					setTorchOn();				
@@ -218,36 +218,25 @@ public class BarCodeScannerFragment extends Fragment implements SurfaceHolder.Ca
 	public void setupConfigFromIntent() {
     	Intent intent = getActivity().getIntent();
     	if (intent != null) {
-    		boolean isOneD = false;
     		if (intent.hasExtra("SCAN_DIMENSION")) {
 	        	if (intent.getStringExtra("SCAN_DIMENSION").equals("1D")) {
 	        		decodeFormats = DecodeFormatManager.ONE_D_FORMATS;
-	        		isOneD = true;
 	        	} else {
 	        		decodeFormats = DecodeFormatManager.QR_CODE_FORMATS;
 	        	}
 	        }
 	        if (intent.hasExtra("SCAN_HEIGHT") && intent.hasExtra("SCAN_WIDTH")) {
 	            int width = intent.getIntExtra("SCAN_WIDTH", 0);
-	            int height = intent.getIntExtra("SCAN_HEIGHT", 0);
-            	Display display = getActivity().getWindowManager().getDefaultDisplay();
-            	Point size = new Point();
-            	display.getSize(size);          	
-	            if (width > 0 && height > 0) {
-	            	if (isOneD) {
-	            		width = size.x;
-	            	}
+	            int height = intent.getIntExtra("SCAN_HEIGHT", 0);            	          	
+	            if (width > 0 && height > 0) {	            	
 	            	Point screenResolution = cameraManager.getViewResolution();
-	            	int leftOffset = 0;
-	            	if (!isOneD) {
-	            		leftOffset = (screenResolution.x - width) / 2;
-	            	}
+            		int leftOffset = (screenResolution.x - width) / 2;	            	
 	                int topOffset = (screenResolution.y - height) / 2;
             		customFramingRect = new Rect(leftOffset, topOffset, leftOffset + width, topOffset + height);	                
 	            }
 	        }
-	        if (intent.hasExtra("PHOTO_CAPTURE")) {
-	        	isPhotoCapture = intent.getBooleanExtra("PHOTO_CAPTURE", false);	
+	        if (intent.hasExtra("SCAN_PHOTO_CAPTURE")) {
+	        	isPhotoCapture = intent.getBooleanExtra("SCAN_PHOTO_CAPTURE", true);	
 	        }
 	             
     	}
@@ -510,8 +499,21 @@ public class BarCodeScannerFragment extends Fragment implements SurfaceHolder.Ca
     	return isPhotoCapture;
     }
     
+    public boolean isPreviewStopped() {
+    	return !cameraManager.getPreviewing();
+    }
+    
     public byte[] getPhotoFromCamera() {
     	return cameraManager.photoFromCamera;
+    }
+    
+    public void resetFlashView() {
+    	if (isTurningFlash) {
+    		flashView.setVisibility(View.VISIBLE);
+			flashLoading.setVisibility(View.INVISIBLE);		
+			isTurningFlash = false;
+			isTorch = !isTorch;
+    	}
     }
     
 }

@@ -393,7 +393,7 @@ public final class CameraManager {
   }
   
   public byte[] takePicture() {
-	  if (takePicture) {
+	  if (takePicture) {		  
 		  stopPreview();
 		  startPreview();
 		  try {
@@ -411,6 +411,10 @@ public final class CameraManager {
 	  }
 	  
 	  return photoFromCamera;
+  }
+  
+  public boolean getPreviewing() {
+	  return previewing;
   }
   
   
