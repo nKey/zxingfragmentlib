@@ -35,7 +35,6 @@ public class ImageHelper {
 
 		/** resize exactly to desired size **/
 		Bitmap scaledBmp = Bitmap.createScaledBitmap(bmp, newWidth, newHeight, true);
-		bmp.recycle();
 		/** rotating **/
 		Matrix mtx = new Matrix();
 		mtx.preRotate(90);
