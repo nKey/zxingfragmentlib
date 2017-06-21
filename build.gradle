@@ -2,11 +2,6 @@ buildscript {
     repositories {
         mavenCentral()
     }
-
-    dependencies {
-        classpath 'com.android.tools.build:gradle:0.6.+'
-        classpath 'com.github.townsfolk:gradle-release:1.2'
-    }
 }
 
 task wrapper(type: Wrapper) {
