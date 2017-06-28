@@ -1,9 +1,5 @@
 package com.welcu.android.zxingfragmentlib;
 
-import java.io.IOException;
-import java.util.Collection;
-import java.util.Map;
-
 import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -18,7 +14,6 @@ import android.os.Message;
 import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
 import android.util.Log;
-import android.view.Display;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.SurfaceHolder;
@@ -36,6 +31,10 @@ import com.google.zxing.DecodeHintType;
 import com.google.zxing.Result;
 import com.google.zxing.ResultPoint;
 import com.welcu.android.zxingfragmentlib.camera.CameraManager;
+
+import java.io.IOException;
+import java.util.Collection;
+import java.util.Map;
 
 /*
  * Copyright (C) 2008 ZXing authors
@@ -221,9 +220,12 @@ public class BarCodeScannerFragment extends Fragment implements SurfaceHolder.Ca
     		if (intent.hasExtra("SCAN_DIMENSION")) {
 	        	if (intent.getStringExtra("SCAN_DIMENSION").equals("1D")) {
 	        		decodeFormats = DecodeFormatManager.ONE_D_FORMATS;
-	        	} else {
+	        	} else if (intent.getStringExtra("SCAN_DIMENSION").equals("2D")) {
 	        		decodeFormats = DecodeFormatManager.QR_CODE_FORMATS;
-	        	}
+	        	} else {
+                    decodeFormats = DecodeFormatManager.QR_CODE_FORMATS;
+                    decodeFormats.addAll(DecodeFormatManager.ONE_D_FORMATS);
+                }
 	        }
 	        if (intent.hasExtra("SCAN_HEIGHT") && intent.hasExtra("SCAN_WIDTH")) {
 	            int width = intent.getIntExtra("SCAN_WIDTH", 0);
