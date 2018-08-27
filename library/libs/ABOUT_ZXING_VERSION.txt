@@ -1,0 +1,3 @@
+As this repository suggest (https://github.com/journeyapps/zxing-android-embedded), for
+compatibility with APIs version that are lower than SDK 19, it is necessary to use the zxing-core
+version 3.3.0.
